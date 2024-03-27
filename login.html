@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="https://use.typekit.net/vya1lsj.css">
+
+  <style>
+      * {
+          box-sizing: border-box;
+      }
+
+      body {
+          font-family: acumin-pro, sans-serif;
+
+          background: #0d1d41;
+
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 90vh;
+
+          padding: 25px;
+      }
+
+      h1 {
+          text-align: center;
+          color: white;
+          text-transform: uppercase;
+      }
+
+      .wrapper {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 40px;
+          padding: 75px 50px;
+
+          box-shadow: 5px 6px 12px 0 rgb(0 0 0 / 20%);
+
+          max-width: 500px;
+          width: 100%;
+      }
+
+      .input-container {
+          position: relative;
+          width: 100%;
+          margin-bottom: 20px;
+      }
+
+      .form-input {
+          width: 100%;
+          padding: 10px;
+
+          outline: none;
+          border: none;
+
+          color: white;
+
+          background: transparent;
+      }
+
+      .input-label {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          transition: all 0.3s ease;
+          pointer-events: none;
+          color: #999;
+
+          text-transform: uppercase;
+      }
+
+      .input-container.focused .input-label {
+          top: -25%;
+          font-size: 12px;
+          color: white;
+      }
+
+      button {
+          background-color: #cf0a2c;
+          box-sizing: border-box;
+          color: #fff;
+          display: block;
+          font-family: acumin-pro,sans-serif;
+          font-size: 18px;
+          font-weight: 700;
+          max-width: 100%;
+          padding: 15px;
+          text-align: center;
+          text-decoration: none;
+          text-transform: uppercase;
+          width: 100%;
+
+          box-shadow: 8px 8px 0px 0 rgb(0 0 0 / 20%);
+
+          transition: all 0.3s ease;
+
+          cursor: pointer;
+
+          border: none;
+      }
+
+      button:disabled {
+          background-color: #999;
+
+          cursor: not-allowed;
+      }
+
+      button:hover {
+          box-shadow: 5px 5px 0 0 rgb(0 0 0 / 50%);
+      }
+
+      .error-message, .error-message-2 {
+          display: none;
+
+          color: #cf0a2c;
+          font-size: 14px;
+          text-align: center;
+          margin-top: 10px;
+      }
+
+      @media screen and (max-width: 700px) {
+          .wrapper {
+              padding: 50px 25px;
+              border-radius: 20px;
+          }
+      }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+  <form method="post" action="/login">
+    <div class="input-container">
+      <input id="username" type="text" name="username" class="form-input" /><br />
+      <label for="username" class="input-label">Username</label>
+    </div>
+
+    <div class="input-container">
+      <input id="password" type="password" name="password" class="form-input" /><br />
+      <label for="password" class="input-label">Password</label>
+    </div>
+
+    <button disabled type="submit" id="submit" class="button-63">
+      <span>Login</span>
+    </button>
+
+    <span class="error-message">Incorrect username or password</span>
+
+    <span class="error-message-2">Something went wrong</span>
+  </form>
+</div>
+
+<script>
+	const inputs = document.querySelectorAll(".form-input");
+	const submit = document.getElementById("submit");
+
+	inputs.forEach((input) => {
+		input.addEventListener("focus", () => {
+			input.parentElement.classList.add("focused");
+		});
+
+		input.addEventListener("blur", () => {
+			if (!input.value) {
+				input.parentElement.classList.remove("focused");
+			}
+		});
+	});
+
+	// Disable the submit button on page load if either input is empty
+	if (!inputs[0].value || !inputs[1].value) {
+		submit.disabled = true;
+	}
+
+	// Enable the submit button when both inputs have values
+	inputs.forEach((input) => {
+		input.addEventListener("input", () => submit.disabled = !(inputs[0].value && inputs[1].value));
+	});
+
+	// On submit, post the form data to the server
+	submit.addEventListener("click", async (event) => {
+		event.preventDefault();
+
+		const username = document.getElementById("username").value;
+		const password = document.getElementById("password").value;
+
+		const error = document.querySelector(".error-message");
+		const error2 = document.querySelector(".error-message-2");
+
+		const formData = new FormData();
+		formData.append("username", username);
+		formData.append("password", password);
+
+		console.log([...formData.entries()]);
+
+		try {
+			const response = await fetch("/login", {
+				method: "POST",
+				body: new URLSearchParams(formData).toString(),
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded"
+				}
+			});
+
+			const data = await response.json();
+
+			if (data.message) {
+				window.location.href = "/";
+			} else {
+				error.style.display = "block";
+			}
+		} catch (error) {
+			console.error("Error logging in:", error);
+
+			error2.style.display = "block";
+		}
+	});
+</script>
+</body>
+</html>
