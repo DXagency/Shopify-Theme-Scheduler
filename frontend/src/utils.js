@@ -12,6 +12,7 @@ const API = {
 
 	getThemes: SERVER + 'api/themes/:id',
 	createSchedule: SERVER + 'api/schedule',
+	createScheduleV2: SERVER + 'api/schedule-v2',
 	getSchedules: SERVER + 'api/schedules',
 	updateSchedule: SERVER + 'api/schedule/:id',
 }
@@ -229,6 +230,35 @@ export const createSchedule = async (formData) => {
 		const data = await response.json();
 
 		console.log("data", data);
+
+		if (data?.error) {
+			console.log('Error creating schedule: ', data.error);
+			return { scheduleError: data.error, schedule: null };
+		}
+
+		return { schedule: data?.schedule || null, scheduleError: null } ;
+	}
+
+	catch (err) {
+		console.log('Error creating schedule: ', err)
+		return { scheduleError: err, schedule: null };
+	}
+}
+
+export const createScheduleV2 = async (id, theme, scheduledAt, storeName = '', themeName = '') => {
+	try {
+		const response = await fetch(API.createScheduleV2, {
+			method: 'POST',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ id, theme, scheduledAt, storeName, themeName })
+		})
+
+		const data = await response.json();
+
+		console.log("Create Schedule Data: ", data);
 
 		if (data?.error) {
 			console.log('Error creating schedule: ', data.error);

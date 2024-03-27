@@ -109,16 +109,28 @@ const ScheduleModel = (sequelize) => {
             allowNull: false,
             defaultValue: false
         },
+        scheduledAt: {
+            type: DataTypes.STRING(64),
+            allowNull: true
+        },
         scheduledAtDate: {
             type: DataTypes.STRING(64),
-            allowNull: false
+            allowNull: true
         },
         scheduledAtTime: {
             type: DataTypes.STRING(64),
-            allowNull: false
+            allowNull: true
         },
         publishedAt: {
             type: DataTypes.DATE,
+            allowNull: true
+        },
+        storeName: {
+            type: DataTypes.STRING(64),
+            allowNull: true
+        },
+        themeName: {
+            type: DataTypes.STRING(64),
             allowNull: true
         }
     }, {

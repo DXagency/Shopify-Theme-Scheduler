@@ -15,9 +15,9 @@ const scheduleJobs = [];
 function initializeApiRoutes(models) {
 	// On mount, check if there are any schedules that need cron jobs
 	models.Schedule.findAll({ where: { enabled: true } })
-		.then((dbSchedules) => {
-			dbSchedules.forEach((schedule) => {
-				const job = createCronJob(schedule, models);
+		.then((schedules) => {
+			schedules.forEach((schedule) => {
+				const job = createCronJobV2(schedule, models);
 
 				if (!job?.error)
 					scheduleJobs.push({
@@ -249,6 +249,7 @@ function initializeApiRoutes(models) {
 			console.log('scheduledAtDate:', dayjs(scheduledAtDate).format(dateFormat));
 			console.log('scheduledAtTime:', dayjs(scheduledAtTime).format(timeFormat));
 
+			// TODO: Set schedule status message
 			const schedule = await models.Schedule.create({
 				enabled: true,
 				storeId: store,
@@ -273,13 +274,46 @@ function initializeApiRoutes(models) {
 		}
   });
 
+	router.post('/schedule-v2', async (req, res) => {
+		try {
+			const { id, theme, scheduledAt, storeName, themeName } = req.body;
+
+			if (!id || !theme || !scheduledAt)
+				return res.status(400).json({ success: false, error: 'Missing required parameters' });
+
+			console.log("POST /schedule-v2");
+
+			const schedule = await models.Schedule.create({
+				enabled: true,
+				storeId: id,
+				themeId: theme.toString(),
+				scheduledAt: scheduledAt,
+				storeName: storeName,
+				themeName: themeName
+			});
+
+			const job = createCronJobV2(schedule, models);
+
+			if (!job?.error) {
+				console.log("Cron job created", job);
+
+				scheduleJobs.push({
+					id: schedule?.id || null,
+					cronJob: job,
+				});
+			}
+
+			return res.status(200).json({ success: true, schedule: schedule });
+		}
+
+		catch (e) {
+			return res.status(500).json({ success: false, error: 'Error scheduling theme', raw: e });
+		}
+	});
+
 	router.get('/schedules', async (req, res) => {
 		try {
-			const schedules = await models.Schedule.findAll({
-				where: {
-					enabled: true
-				}
-			});
+			const schedules = await models.Schedule.findAll({});
 
 			return res.status(200).json({ success: true, schedules: schedules });
 		}
@@ -301,6 +335,7 @@ function initializeApiRoutes(models) {
 			if (!schedule)
 				return res.status(400).json({ success: false, error: 'Schedule not found' });
 
+			// TODO: Set schedule status message
 			schedule.themeId = theme;
 			schedule.scheduledAtDate = scheduledAtDate;
 			schedule.scheduledAtTime = scheduledAtTime;
@@ -451,7 +486,105 @@ function createCronJob(schedule, models) {
 
 				console.log('updateThemeData', updateThemeData);
 
-				// disable schedule in database and update cache
+				// TODO: Set schedule status message
+				const updatedSchedule = await models.Schedule.findOne({where: {id: schedule.id}});
+				updatedSchedule.enabled = false;
+				updatedSchedule.save();
+
+				const index = scheduleJobs.findIndex((scheduleJob) => scheduleJob.id === schedule.id);
+
+				if (index > -1) {
+					scheduleJobs[index].cronJob.stop();
+					scheduleJobs.splice(index, 1);
+
+					console.log('Stopped cron job for schedule', schedule.id);
+				}
+
+				return { success: true };
+			}
+
+			catch (e) {
+				console.log("Error running cron job", e);
+			}
+		}
+	});
+}
+
+function createCronJobV2(schedule, models) {
+	const { scheduledAt, themeId, storeId } = schedule;
+
+	if (!scheduledAt || !themeId || !storeId)
+		return { error: 'Missing required parameters' };
+
+	// check if scheduledAt is in the past
+	if (dayjs(scheduledAt).isBefore(dayjs())) {
+		// disable schedule in database
+		schedule.enabled = false;
+		schedule.save();
+		return { error: 'Scheduled time is in the past' };
+	}
+
+	const cronTime = "0 " + dayjs(scheduledAt).format('mm HH DD MM') + " *";
+	console.log("cronTime", cronTime);
+
+	return CronJob.from({
+		cronTime: cronTime,
+		runOnce: true,
+		start: true,
+		onTick: async function () {
+			try {
+				console.log('Running cron job for schedule', schedule.id);
+
+				const store = await models.Stores.findOne({where: {id: storeId}});
+
+				if (!store) {
+					console.log('Store not found for schedule', schedule.id);
+					return { error: 'Store not found' };
+				}
+
+				const formattedUrl = store.url.replace('https://', '').replace('http://', '').replace('/', '');
+
+				const themesAPI = "https://" + formattedUrl + SHOPIFY_API_URL.getThemes;
+				const deployAPI = "https://" + formattedUrl + SHOPIFY_API_URL.updateTheme.replace(':id', themeId);
+
+				const themesResponse = await fetch(themesAPI, {
+					method: 'GET',
+					headers: {
+						'X-Shopify-Access-Token': store.token
+					},
+					credentials: 'include'
+				});
+				const themesData = await themesResponse.json();
+
+				if (!themesData?.themes) {
+					console.log('Themes not found for store', store.id);
+					return { error: 'Theme not found' };
+				}
+
+				const targetTheme = themesData.themes.find((theme) => theme.id.toString() === themeId.toString());
+
+				if (!targetTheme) {
+					console.log('Target theme not found for schedule', schedule.id);
+					return { error: 'Theme not found' };
+				}
+
+				const deployResponse = await fetch(deployAPI, {
+					method: 'PUT',
+					headers: {
+						'X-Shopify-Access-Token': store.token,
+						'Content-Type': 'application/json'
+					},
+					credentials: 'include',
+					body: JSON.stringify({
+						theme: {
+							id: targetTheme.id,
+							role: 'main'
+						}
+					})
+				});
+				const deployData = await deployResponse.json();
+
+				// TODO: Set schedule status message
 				const updatedSchedule = await models.Schedule.findOne({where: {id: schedule.id}});
 				updatedSchedule.enabled = false;
 				updatedSchedule.save();

@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import {
 	Text,
 	Toast,
@@ -6,26 +5,43 @@ import {
 	BlockStack,
 	Page,
 	Button,
-	ButtonGroup,
 	Modal,
 	FormLayout,
 	TextField,
 	InlineStack,
 	Icon, InlineError,
-	Tooltip, DatePicker, Popover
+	Tooltip, DatePicker, Popover,
+	Select
 } from '@shopify/polaris';
-import {createStoreV2, deleteStore, getStores, editStore} from '../utils';
+import {
+	createStoreV2,
+	deleteStore,
+	getStores,
+	editStore,
+	getThemes,
+	createScheduleV2
+} from '../utils';
+import React, { useState, useEffect } from 'react';
 import moment from "moment";
 
 import {
-	AlertCircleIcon,
+	CalendarTimeIcon,
 	CalendarIcon,
 	ClockIcon,
 	DeleteIcon,
-	EditIcon
+	EditIcon,
+	ViewIcon,
+	HideIcon,
+	ThemeTemplateIcon
 } from '@shopify/polaris-icons';
 
 const Stores = () => {
+	const addStoreModalTitle = 'Add Store';
+	const editStoreModalTitle = 'Edit Store';
+	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', 'Actions'];
+	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
+	const defaultOffset = 31;
+
 	const [stores, setStores] = useState([]);
 	const [addStoreModal, setAddStoreModal] = useState({
 		modalActive: false,
@@ -47,7 +63,8 @@ const Stores = () => {
 		modalActive: false,
 		store: {},
 		theme: {},
-		error: ''
+		error: '',
+		scheduledAtMessage: ''
 	});
 	const [toast, setToast] = useState({
 		active: false,
@@ -61,24 +78,19 @@ const Stores = () => {
 		datePickerActive: false
 	});
 	const [selectedTime, setSelectedTime] = useState({
-		selected: moment().format('HH:mm'),
-		selectableTimes: []
+		hour: moment().add(defaultOffset, 'minutes').format('h'),
+		hour24: moment().add(defaultOffset, 'minutes').format('HH'),
+		minute: moment().add(defaultOffset, 'minutes').format('m'),
+		meridiem: moment().add(defaultOffset, 'minutes').format('A'),
+		selectedText: moment().add(defaultOffset, 'minutes').format('hh:mm A'),
+		time24: moment().add(defaultOffset, 'minutes').format('HH:MM'),
+		timePickerActive: false
 	});
-
-	// Get Every 15 minutes left in the day
-	const allTimesInDay = Array.from({length: 24}, (v, k) => k).map((hour) => {
-		return Array.from({length: 4}, (v, k) => k).map((quarter) => {
-					return `${hour.toFixed(2)}:${(quarter * 15).toFixed(2)}`;
-				});
-	})
-
-	console.log("All Times in Day:", allTimesInDay.flat());
-
-	const addStoreModalTitle = 'Add Store';
-	const editStoreModalTitle = 'Edit Store';
-
-	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', 'Actions'];
-	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
+	const [selectedTheme, setSelectedTheme] = useState({
+		theme: '',
+		options: [],
+		loading: false
+	});
 
 	const toastMarkup = toast.active ? (
 			<Toast
@@ -86,6 +98,27 @@ const Stores = () => {
 				onDismiss={ () => setToast({ active: false, content: '' })}
 		/>
 	) : null;
+
+	const selectDateActivator = (
+			<TextField
+					autoComplete='off'
+					label='Date'
+					prefix={ <Icon source={CalendarIcon} /> }
+					value={ selectedDate.selectedText }
+					onFocus={ () => setSelectedDate({...selectedDate, datePickerActive: true}) }
+					onChange={ (value) => { setSelectedDate({...selectedDate, selectedText: value}) }}
+			/>
+	);
+
+	const selectTimeActivator = (
+			<TextField
+				autoComplete='off'
+				label='Time'
+				prefix={ <Icon source={ClockIcon} /> }
+				value={ selectedTime.selectedText }
+				onFocus={ () => setSelectedTime({...selectedTime, timePickerActive: true}) }
+			/>
+	);
 
 	useEffect(() => {
 		getStores().then((stores) => {
@@ -110,7 +143,7 @@ const Stores = () => {
 								<InlineStack gap="400">
 									<Tooltip content='Schedule Theme'>
 										<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store, 'schedule') }>
-											<Icon source={ClockIcon} accessibilityLabel='Schedule Theme' />
+											<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
 										</Button>
 									</Tooltip>
 
@@ -218,51 +251,114 @@ const Stores = () => {
 			<Modal open={ createScheduleModal.modalActive } title='Schedule Theme Publish' onClose={ closeAllModals }>
 				<Modal.Section>
 					<FormLayout>
+						<Select
+								label='Theme'
+								disabled={ selectedTheme.loading }
+								value={ selectedTheme.theme }
+								onChange={ handleThemeSelection }
+								options={ selectedTheme.options }
+						/>
+
+						<FormLayout.Group condensed>
+							<Popover
+									fullHeight sectioned preventFocusOnClose
+									fullWidth={false}
+									preferInputActivator={false}
+									preferredAlignment='center'
+									autofocusTarget='container'
+									active={ selectedDate.datePickerActive }
+									activator={ selectDateActivator }
+									onClose={ () => setSelectedDate({...selectedDate, datePickerActive: false}) }
+							>
+								<Popover.Section>
+									<DatePicker
+											month={selectedDate.month}
+											year={selectedDate.year}
+											selected={selectedDate.selected}
+											onChange={ (date) => handleDateSelection(date) }
+											onMonthChange={ (month, year) => handleMonthChange(month, year) }
+									/>
+
+									<InlineStack align='end' gap='400'>
+										<Button variant='plain' onClick={ () => setSelectedDate({...selectedDate, datePickerActive: false}) }>Close</Button>
+									</InlineStack>
+								</Popover.Section>
+							</Popover>
+
+							<Popover
+									fullHeight sectioned preventFocusOnClose
+									fullWidth={false}
+									preferInputActivator={false}
+									preferredAlignment='center'
+									autofocusTarget='container'
+									active={ selectedTime.timePickerActive }
+									activator={ selectTimeActivator }
+									onClose={ () => setSelectedTime({...selectedTime, timePickerActive: false}) }
+							>
+								<Popover.Section>
+									<FormLayout>
+										<FormLayout.Group condensed>
+											<TextField
+													autoComplete='off'
+													label='Hour'
+													type='number'
+													min={ 1 }
+													max={ 12 }
+													value={ selectedTime.hour }
+													onChange={(value) => {
+														handleTimeSelection(value, selectedTime.minute, selectedTime.meridiem)
+													}}
+											/>
+
+											<TextField
+													autoComplete='off'
+													label='Minute'
+													type='number'
+													min={ 0 }
+													max={ 59 }
+													value={ selectedTime.minute }
+													onChange={(value) => {
+														handleTimeSelection(selectedTime.hour, value, selectedTime.meridiem)
+													}}
+											/>
+
+											<Select
+													label='Meridiem'
+													options={[
+														{ label: 'AM', value: 'AM' },
+														{ label: 'PM', value: 'PM' }
+													]}
+													value={ selectedTime.meridiem }
+													onChange={(value) => {
+														handleTimeSelection(selectedTime.hour, selectedTime.minute, value)
+													}}
+											/>
+										</FormLayout.Group>
+
+										<FormLayout.Group >
+											<InlineStack align='end' gap='400'>
+												<Button variant='plain' onClick={ () => setSelectedTime({...selectedTime, timePickerActive: false}) }>Close</Button>
+											</InlineStack>
+										</FormLayout.Group>
+
+									</FormLayout>
+								</Popover.Section>
+							</Popover>
+						</FormLayout.Group>
+
 						<TextField
+								disabled
 								label='Store Name'
 								autoComplete='off'
-								value={editStoreModal.editName}
-								disabled
+								value={ createScheduleModal.store?.name }
 						/>
 
 						<TextField
+								disabled
 								label='Shopify URL'
 								autoComplete='off'
-								value={editStoreModal.store?.url}
-								disabled
+								value={ createScheduleModal.store?.url }
 						/>
-
-						<Popover
-								fullWidth
-								fullHeight
-								sectioned
-                preventFocusOnClose
-								active={selectedDate.datePickerActive}
-								preferredAlignment={ 'center'}
-								autofocusTarget='first-node'
-								onClose={ () => setSelectedDate({...selectedDate, datePickerActive: false}) }
-								activator={
-									<TextField
-										 autoComplete='off'
-										 prefix={<Icon source={CalendarIcon} />}
-										 label='Select Date'
-										 onFocus={ () => setSelectedDate({...selectedDate, datePickerActive: true}) }
-										 onBlur={ checkSelectedDateText }
-										 value={selectedDate.selectedText}
-										 onChange={ (value) => { setSelectedDate({...selectedDate, selectedText: value}) }}
-									/>
-								}
-						>
-							<Popover.Section>
-								<DatePicker
-										month={selectedDate.month}
-										year={selectedDate.year}
-										selected={selectedDate.selected}
-										onChange={ (date) => handleDateSelection(date) }
-										onMonthChange={ (month, year) => handleMonthChange(month, year) }
-								/>
-							</Popover.Section>
-						</Popover>
 
 						{ editStoreModal.error &&
 								<InlineError
@@ -274,6 +370,18 @@ const Stores = () => {
 				</Modal.Section>
 
 				<Modal.Section>
+					<InlineStack gap='400' align='space-between'>
+						<Text as='p'>
+							{ createScheduleModal.scheduledAtMessage }
+						</Text>
+
+						<InlineStack gap='400' align='end'>
+							<Button variant='plain' onClick={closeAllModals}>Cancel</Button>
+							<Button variant="primary" onClick={handleSchedulePublish}>
+								Schedule Publish
+							</Button>
+						</InlineStack>
+					</InlineStack>
 				</Modal.Section>
 			</Modal>
 
@@ -282,10 +390,51 @@ const Stores = () => {
 	);
 
 	function closeAllModals() {
-		setAddStoreModal({ ...addStoreModal, modalActive: false });
-		setEditStoreModal({ ...editStoreModal, modalActive: false });
-		setDeleteStoreModal({ ...deleteStoreModal, modalActive: false });
-		setCreateScheduleModal({ ...createScheduleModal, modalActive: false });
+		setAddStoreModal({
+			...addStoreModal,
+			modalActive: false,
+			url: '',
+			apiKey: '',
+			error: ''
+		});
+
+		setEditStoreModal({
+			...editStoreModal,
+			modalActive: false,
+			store: {},
+			editName: ''
+		});
+
+		setDeleteStoreModal({
+			...deleteStoreModal,
+			modalActive: false,
+			store: {}
+		});
+
+		setCreateScheduleModal({
+			...createScheduleModal,
+			modalActive: false,
+			store: {},
+			theme: {},
+			error: '',
+			scheduledAtMessage: ''
+		});
+
+		// Reset selected date and time to 30 minutes from now
+		setSelectedDate({
+			...selectedDate,
+			selectedText: moment().format('MM/DD/YYYY')
+		});
+
+		setSelectedTime({
+			...selectedTime,
+			hour: moment().add(defaultOffset, 'minutes').format('h'),
+			hour24: moment().add(defaultOffset, 'minutes').format('HH'),
+			minute: moment().add(defaultOffset, 'minutes').format('m'),
+			meridiem: moment().add(defaultOffset, 'minutes').format('A'),
+			selectedText: moment().add(defaultOffset, 'minutes').format('hh:mm A'),
+			time24: moment().add(defaultOffset, 'minutes').format('HH:MM'),
+		});
 	}
 
 	function openModal(modal) {
@@ -403,7 +552,33 @@ const Stores = () => {
 		}
 
 		else if (modal === 'schedule') {
-			setCreateScheduleModal({ ...createScheduleModal, store: store, modalActive: true });
+
+			setCreateScheduleModal({
+				...createScheduleModal,
+				store: store,
+				modalActive: true,
+				scheduledAtMessage: calculateScheduledAtMessage(selectedDate.selected?.start, selectedTime.hour24, selectedTime.minute)
+			});
+
+			setSelectedTheme({ ...selectedTheme, loading: true });
+
+			getThemes(store.id).then((themes) => {
+				const optionsMapped = themes.map((theme) => {
+					return {
+						label: theme.role === 'main' ? theme.name + " - Live" : theme.name,
+						value: theme.role === 'main' ? '' : theme.id.toString(),
+						prefix: <Icon source={ ThemeTemplateIcon } />,
+						disabled: theme.role === 'main'
+					}
+				});
+
+				setSelectedTheme({
+					...selectedTheme,
+					options: optionsMapped,
+					loading: false,
+					theme: optionsMapped.find(theme => theme.disabled === false)?.value
+				});
+			});
 		}
 	}
 
@@ -412,25 +587,121 @@ const Stores = () => {
 	}
 
 	function handleDateSelection(date) {
-		console.log("New Date:", date);
-		console.log("New Date:", moment(date).format('MM/DD/YYYY'));
-
 		setSelectedDate({
 			...selectedDate,
 			datePickerActive: false,
 			selected: date,
 			selectedText: moment(date.start).format('MM/DD/YYYY')
 		});
+
+		setCreateScheduleModal({
+			...createScheduleModal,
+			scheduledAtMessage: calculateScheduledAtMessage(date.start, selectedTime.hour24, selectedTime.minute)
+		});
 	}
 
-	function checkSelectedDateText() {
-		// Check if the selected date is valid
-		console.log("Selected Date:", selectedDate.selectedText);
-		console.log("Selected Date (isValid):", moment(selectedDate.selectedText, 'MM/DD/YYYY').isValid());
+	function handleTimeSelection(hour, minute, meridiem) {
+		hour = hour > 12 || hour < 1 ? 1 : hour;
+		minute = minute > 60 || minute < 0 ? 0 : minute;
+		meridiem = meridiem !== 'AM' && meridiem !== 'PM' ? 'AM' : meridiem;
 
-		if (!moment(selectedDate.selectedText, 'MM/DD/YYYY').isValid()) {
-			setSelectedDate({...selectedDate, selectedText: moment(selectedDate.selected.start).format('MM/DD/YYYY')})
+		const timeText = `${ hour }:${ minute } ${ meridiem }`
+		const time24 = moment(timeText, 'hh:mm A').format('HH:mm');
+		const hour24 = moment(timeText, 'hh:mm A').format('HH');
+
+		setSelectedTime({
+			...selectedTime,
+			hour,
+			minute,
+			meridiem,
+			selectedText: moment(timeText, 'hh:mm A').format('hh:mm A'),
+			time24,
+			hour24,
+		});
+
+		setCreateScheduleModal({
+			...createScheduleModal,
+			scheduledAtMessage: calculateScheduledAtMessage(selectedDate.selected?.start, hour24, minute)
+		});
+	}
+
+	function handleThemeSelection(theme) {
+		setSelectedTheme({ ...selectedTheme, theme });
+	}
+
+	function handleSchedulePublish() {
+		// Combine selectedDate and selectedTime into a single date object
+		let scheduledAt = moment(selectedDate.selectedText, 'MM/DD/YYYY');
+		scheduledAt.set('hour', parseInt(selectedTime.hour24));
+		scheduledAt.set('minute', parseInt(selectedTime.minute));
+
+		const themeName = selectedTheme.options.find(option => option.value === selectedTheme.theme)?.label;
+
+		createScheduleV2(
+				createScheduleModal.store.id,
+				selectedTheme.theme,
+				scheduledAt.toISOString(),
+				createScheduleModal.store.name,
+				themeName
+		).then((data) => {
+			if (data?.error) {
+				console.log('Error creating schedule: ', data.error);
+				setCreateScheduleModal({...createScheduleModal, error: data.error});
+				return;
+			}
+
+			setCreateScheduleModal({
+				...createScheduleModal,
+				modalActive: false,
+				store: {},
+				theme: {},
+				error: ''
+			});
+
+			setToast({ active: true, content: 'Theme Scheduled for Publish!' });
+		});
+	}
+
+	function calculateScheduledAtMessage(date, hour24, minute) {
+		const formattedDate = moment(date).format('MM/DD/YYYY');
+		const scheduledAt = moment(formattedDate, 'MM/DD/YYYY');
+		scheduledAt.set('hour', parseInt(hour24));
+		scheduledAt.set('minute', parseInt(minute));
+
+		const diff = scheduledAt.diff(moment(), 'minutes');
+		const diffHours = Math.floor(diff / 60);
+		const diffDays = Math.floor(diff / 1440);
+		const diffHoursInDay = Math.floor((diff % 1440) / 60);
+		const diffDaysSuffix = diffDays > 1 ? 's' : '';
+		const diffHoursSuffix = diffHours > 1 ? 's' : '';
+		const diffHoursInDaySuffix = diffHoursInDay > 1 ? 's' : '';
+		const diffMinutesSuffix = diff > 1 ? 's' : '';
+
+		const messagePrefix = 'Scheduled time is ';
+
+		 if (diff < 0) {
+			return 'Scheduled time has already passed';
 		}
+
+		 else if (diff === 0 ) {
+			 return messagePrefix + 'now';
+		 }
+
+		 else if (diff > 1440 && (Math.floor((diff % 1440) / 60)) !== 0) {
+			 return messagePrefix + `${diffDays} day${diffDaysSuffix} and ${diffHoursInDay} hour${diffHoursInDaySuffix} from now`;
+		 }
+
+		 else if (diff > 1440) {
+			 return messagePrefix + `${diffDays} day${diffDaysSuffix} from now`;
+		 }
+
+		 else if (diff > 60) {
+			 return messagePrefix + `${diffHours} hour${diffHoursSuffix} from now`;
+		 }
+
+		 else {
+			 return messagePrefix + `${ diff } minute${diffMinutesSuffix} from now`;
+		 }
 	}
 };
 
