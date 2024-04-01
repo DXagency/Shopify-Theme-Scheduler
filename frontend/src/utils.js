@@ -15,6 +15,7 @@ const API = {
 	createScheduleV2: SERVER + 'api/schedule-v2',
 	getSchedules: SERVER + 'api/schedules',
 	updateSchedule: SERVER + 'api/schedule/:id',
+	updateScheduleAction: SERVER + 'api/schedule-action/:id',
 }
 
 export const verifyLogin = async () => {
@@ -326,6 +327,36 @@ export const updateSchedule = async (id, formData) => {
 		console.log('Error updating schedule: ', err)
 		return { scheduleError: err, schedule: null };
 	}
+}
+
+export const updateScheduleAction = async (id, action) => {
+	try {
+		const response = await fetch(API.updateScheduleAction.replace(':id', id), {
+			method: 'PUT',
+			credentials: 'include',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ action })
+		})
+
+		const data = await response.json();
+
+		console.log("data", data);
+
+		if (data?.error) {
+			console.log('Error updating schedule action: ', data.error);
+			return { scheduleError: data.error, schedule: null };
+		}
+
+		return { schedule: data?.schedule || null, scheduleError: null } ;
+	}
+
+	catch (err) {
+		console.log('Error updating schedule action: ', err)
+		return { scheduleError: err, schedule: null };
+	}
+
 }
 
 export const deleteSchedule = async (id) => {

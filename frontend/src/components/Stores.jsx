@@ -38,7 +38,7 @@ import {
 const Stores = () => {
 	const addStoreModalTitle = 'Add Store';
 	const editStoreModalTitle = 'Edit Store';
-	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', 'Actions'];
+	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', ''];
 	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
 	const defaultOffset = 31;
 
@@ -140,7 +140,7 @@ const Stores = () => {
 								store?.url || 'N/A',
 								store?.owner || 'N/A',
 								store?.shopifyId || 'N/A',
-								<InlineStack gap="400">
+								<InlineStack gap="400" align='center'>
 									<Tooltip content='Schedule Theme'>
 										<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store, 'schedule') }>
 											<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
@@ -158,7 +158,7 @@ const Stores = () => {
 											<Icon source={DeleteIcon} />
 										</Button>
 									</Tooltip>
-								</InlineStack>
+								</InlineStack>,
 							];
 						})}
 				/>
@@ -438,17 +438,25 @@ const Stores = () => {
 	}
 
 	function openModal(modal) {
-		if (modal === 'add') {
-			setAddStoreModal({ ...addStoreModal, modalActive: true });
-		}
-		else if (modal === 'edit') {
-			setEditStoreModal({ ...editStoreModal, modalActive: true });
-		}
-		else if (modal === 'delete') {
-			setDeleteStoreModal({ ...deleteStoreModal, modalActive: true });
-		}
-		else if (modal === 'schedule') {
-			setCreateScheduleModal({ ...createScheduleModal, modalActive: true });
+		switch (modal) {
+			case 'add':
+				setAddStoreModal({ ...addStoreModal, modalActive: true });
+				break;
+
+			case 'edit':
+				setEditStoreModal({ ...editStoreModal, modalActive: true });
+				break;
+
+			case 'delete':
+				setDeleteStoreModal({ ...deleteStoreModal, modalActive: true });
+				break;
+
+			case 'schedule':
+				setCreateScheduleModal({ ...createScheduleModal, modalActive: true });
+				break;
+
+			default:
+				break;
 		}
 	}
 

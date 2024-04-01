@@ -369,6 +369,72 @@ function initializeApiRoutes(models) {
 		}
 	});
 
+	router.put('/schedule-action/:id', async (req, res) => {
+		try {
+			const { action } = req.body;
+			const { id } = req.params;
+
+			if (!id || !action) {
+				return res.status(400).json({ success: false, error: 'Missing required parameters' });
+			}
+
+			const schedule = await models.Schedule.findOne({ where: { id: id } });
+
+			if (!schedule) {
+				return res.status(400).json({ success: false, error: 'Schedule not found' });
+			}
+
+			if (action === 'start') {
+				const job = createCronJobV2(schedule, models);
+
+				if (!job?.error) {
+					scheduleJobs.push({
+						id: schedule?.id || null,
+						cronJob: job
+					});
+
+					console.log('Started cron job for schedule', schedule.id);
+
+					return res.status(200).json({ success: true, schedule: schedule });
+				}
+
+				else {
+					console.log('Error starting cron job for schedule', schedule.id);
+
+					return res.status(400).json({ success: false, error: 'Error starting cron job' });
+				}
+			}
+
+			if (action === 'stop') {
+				const index = scheduleJobs.findIndex((scheduleJob) => scheduleJob.id === schedule.id);
+
+				if (index > -1) {
+					scheduleJobs[index].cronJob.stop();
+					scheduleJobs.splice(index, 1);
+
+					schedule.enabled = false;
+					schedule.save();
+
+					console.log('Stopped cron job for schedule', schedule.id);
+
+					return res.status(200).json({ success: true, schedule: schedule });
+				}
+
+				else {
+					console.log('No cron job found for schedule', schedule.id);
+
+					return res.status(400).json({ success: false, error: 'No cron job found for schedule' });
+				}
+			}
+
+			return res.status(200).json({ success: false, error: 'Invalid action' });
+		}
+
+		catch (err) {
+			return res.status(500).json({ success: false, error: 'Error updating schedule action', raw: err });
+		}
+	});
+
 	router.delete('/schedule/:id', async (req, res) => {
 		try {
 			const schedule = await models.Schedule.findOne({ where: { id: req.params.id }});
@@ -516,13 +582,16 @@ function createCronJobV2(schedule, models) {
 	if (!scheduledAt || !themeId || !storeId)
 		return { error: 'Missing required parameters' };
 
-	// check if scheduledAt is in the past
 	if (dayjs(scheduledAt).isBefore(dayjs())) {
-		// disable schedule in database
+		// TODO: Set schedule status message
 		schedule.enabled = false;
 		schedule.save();
 		return { error: 'Scheduled time is in the past' };
 	}
+
+	// TODO: Set schedule status message
+	schedule.enabled = true;
+	schedule.save();
 
 	const cronTime = "0 " + dayjs(scheduledAt).format('mm HH DD MM') + " *";
 	console.log("cronTime", cronTime);
