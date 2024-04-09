@@ -4,7 +4,7 @@
   "description": "A simple Shopify theme scheduler",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently -c auto -n SERVER,client \"npm run server\" \"npm run client\"",
+    "start": "nodemon index.js",
     "frontend": "cd frontend && npm start",
     "server": "nodemon index.js",
     "postinstall": "cd frontend && npm install",
