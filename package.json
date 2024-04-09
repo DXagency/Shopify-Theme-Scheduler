@@ -7,7 +7,7 @@
     "start": "concurrently -c auto -n SERVER,client \"npm run server\" \"npm run client\"",
     "frontend": "cd frontend && npm start",
     "server": "nodemon index.js",
-    "preinstall": "npm install",
+    "postinstall": "cd frontend && npm install",
     "build": "cd frontend && npm run build"
   },
   "author": "",
