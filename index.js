@@ -18,7 +18,7 @@ const APP = express();
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const STATIC_REACT_FILES = '/frontend/build';
 const DATABASE_CONFIG = {
-    database: process.env.DB,
+    database: process.env.DB || null,
     user: process.env.USER,
     password: process.env.PASS,
     host: process.env.HOST,
@@ -68,8 +68,10 @@ async function connectDatabase() {
         log('Starting initial connection test...', 'lightCyan');
         await DATABASE_CLIENT.connect(null);
 
-        log('Connected to database server successfully, creating database...', 'cyan');
-        await DATABASE_CLIENT.query('CREATE DATABASE ' + DATABASE_CONFIG.database);
+        if (DATABASE_CONFIG.database) {
+            log('Connected to database server successfully, creating database...', 'cyan');
+            await DATABASE_CLIENT.query('CREATE DATABASE ' + DATABASE_CONFIG.database);
+        }
 
         log('Database created successfully, syncing models...', 'cyan');
         await syncModels();
