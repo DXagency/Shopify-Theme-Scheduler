@@ -1,8 +1,9 @@
-const SERVER = 'http://localhost:3000/';
+const SERVER = process.env.REACT_APP_API_HOST || 'http://localhost:3001/';
 const API = {
 	auth_verify: SERVER + 'auth/verify',
 	auth_login: SERVER + 'auth/login',
 	auth_register: SERVER + 'auth/register',
+	auth_logout: SERVER + 'auth/logout',
 
 	getStores: SERVER + 'api/stores',
 	getStore: SERVER + 'api/stores/:id',
@@ -27,13 +28,35 @@ export const verifyLogin = async () => {
 
 		const data = await response.json();
 
-		return !!data.success;
+		if (data.success)
+			return data.role
+
+		return false;
 	}
 
 	catch (err) {
-		console.log('Error: ', err);
+		console.log('Error in verifyLogin: ', err);
 		return false;
 	}
+}
+
+export const logout = async () => {
+	try {
+		const response = await fetch(API.auth_logout, {
+			method: 'GET',
+			credentials: 'include'
+		})
+
+		const data = await response.json();
+
+		return data.success;
+	}
+
+	catch (err) {
+		console.log('Error in logout: ', err);
+		return false;
+	}
+
 }
 
 export const createStore = async (formData) => {

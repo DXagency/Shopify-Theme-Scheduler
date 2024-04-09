@@ -7,11 +7,11 @@ import {
 	InlineStack,
 	Text,
 	Tooltip,
-	Page,
 	Modal,
-	FormLayout, TextField, InlineError
+	FormLayout, InlineError,
+	SkeletonBodyText
 } from '@shopify/polaris';
-import { createScheduleV2, getSchedules, updateSchedule, deleteSchedule, updateScheduleAction } from '../utils';
+import { getSchedules, updateScheduleAction } from '../utils';
 
 import {
 	PlayCircleIcon,
@@ -20,16 +20,16 @@ import {
 
 import moment from 'moment';
 
-const Schedules = () => {
+const Schedules = (props) => {
 	const headings = ['', 'Store Name', 'Theme', 'Scheduled At', 'Status'];
 	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
 	const startTitle = 'Start Schedule';
 	const stopTitle = 'Stop Schedule';
 	const pageTitle = 'Schedules';
 	const updateScheduleActionTitle = 'Update Schedule Action';
-	const defaultOffset = 31;
 
 	const [schedules, setSchedules] = useState([]);
+	const [isSchedulesEmpty, setIsSchedulesEmpty] = useState(false);
 	const [updateActionModal, setUpdateActionModal] = useState({
 		active: false,
 		schedule: {},
@@ -37,73 +37,70 @@ const Schedules = () => {
 		action: '',
 		error: ''
 	});
-	const [selectedDate, setSelectedDate] = useState({
-		month: moment().month(),
-		year: moment().year(),
-		selected: new Date(),
-		selectedText: moment().format('MM/DD/YYYY'),
-		datePickerActive: false
-	});
-	const [selectedTime, setSelectedTime] = useState({
-		hour: moment().add(defaultOffset, 'minutes').format('h'),
-		hour24: moment().add(defaultOffset, 'minutes').format('HH'),
-		minute: moment().add(defaultOffset, 'minutes').format('m'),
-		meridiem: moment().add(defaultOffset, 'minutes').format('A'),
-		selectedText: moment().add(defaultOffset, 'minutes').format('hh:mm A'),
-		time24: moment().add(defaultOffset, 'minutes').format('HH:MM'),
-		timePickerActive: false
-	});
+
+	useEffect(updateScheduleState, []);
 
 	useEffect(() => {
-		getSchedules().then((schedules) => {
-			console.log('schedules', schedules)
-			setSchedules(schedules);
-		});
-	}, []);
+		if (props.update) {
+			updateScheduleState();
+		}
+	}, [props]);
 
 	return (
-			<Page title={pageTitle} primaryAction={
-				<Button variant='primary' onClick={ () => openModal('add') }>New</Button>
-			}>
-				<BlockStack>
-					<DataTable
-							columnContentTypes={columnContentTypes}
-							headings={headings}
-							rows={schedules.map((schedule) => {
-								return [
-									<InlineStack gap='100'>
-										{ schedule?.enabled ? (
-												<Tooltip content={stopTitle}>
-													<Button
-														variant='plain'
-														tone='critical'
-														onClick={ () => openUpdateActionModal('stop', schedule)}
-														disabled={!schedule?.enabled}
-													>
-														<Icon source={ StopCircleIcon } accessibilityLabel={stopTitle} />
-													</Button>
-												</Tooltip>
-										) : (
-												<Tooltip content={startTitle}>
-													<Button
-														variant='plain'
-														tone='success'
-														onClick={ () => openUpdateActionModal('start', schedule)}
-														disabled={schedule?.enabled}
-													>
-														<Icon source={ PlayCircleIcon } accessibilityLabel={startTitle} />
-													</Button>
-												</Tooltip>
-										)
-										}
-									</InlineStack>,
-									schedule?.storeName || 'N/A',
-									schedule?.themeName || 'N/A',
-									moment(schedule?.scheduledAt).format('MMM Do, YYYY hh:mm a') || 'N/A',
-									schedule?.enabled ? 'Enabled' : 'Stopped'
-								];
-							})}
-					/>
+			<>
+				<BlockStack gap='400'>
+					<InlineStack gap='400' align='space-between'>
+						<Text as='h2' variant="headingXl">
+							{ pageTitle }
+						</Text>
+					</InlineStack>
+
+					{ schedules.length !== 0 ? (
+							<DataTable
+									columnContentTypes={columnContentTypes}
+									headings={headings}
+									rows={schedules.map(schedule => {
+										return [
+											<InlineStack gap='100' key={schedule.id}>
+												{ schedule?.enabled ? (
+														<Tooltip content={stopTitle}>
+															<Button
+																	variant='plain'
+																	tone='critical'
+																	onClick={ () => openUpdateActionModal('stop', schedule)}
+																	disabled={!schedule?.enabled}
+															>
+																<Icon source={ StopCircleIcon } accessibilityLabel={stopTitle} />
+															</Button>
+														</Tooltip>
+												) : (
+														<Tooltip content={startTitle}>
+															<Button
+																	variant='plain'
+																	tone='success'
+																	onClick={ () => openUpdateActionModal('start', schedule)}
+																	disabled={moment(schedule?.scheduledAt).diff(moment(), 'minutes') < 0}
+															>
+																<Icon source={ PlayCircleIcon } accessibilityLabel={startTitle} />
+															</Button>
+														</Tooltip>
+												)
+												}
+											</InlineStack>,
+											schedule?.storeName || 'N/A',
+											schedule?.themeName || 'N/A',
+											moment(schedule?.scheduledAt).format('MMM Do, YYYY hh:mm a') || 'N/A',
+											schedule?.enabled ? 'Enabled' : 'Stopped'
+										];
+									})}
+							/>
+					) : (
+							<DataTable columnContentTypes={columnContentTypes} headings={headings} rows={
+								Array(20).fill(0).map(() => {
+									return headings.map(heading => <SkeletonBodyText lines={1} key={heading} />);
+								})
+							} />
+					)}
 				</BlockStack>
 
 				<Modal open={ updateActionModal.active } title={ updateScheduleActionTitle } onClose={ closeAllModals }>
@@ -143,13 +140,8 @@ const Schedules = () => {
 						</InlineStack>
 					</Modal.Section>
 				</Modal>
-			</Page>
+			</>
 	);
-
-	function openModal(modal) {
-		switch (modal) {
-		}
-	}
 
 	function openUpdateActionModal(action, schedule) {
 		const diff = moment(schedule.scheduledAt).diff(moment(), 'minutes');
@@ -175,13 +167,28 @@ const Schedules = () => {
 					return;
 				}
 
-				getSchedules().then((schedules) => {
-					console.log('schedules', schedules)
-					setSchedules(schedules);
-
-					closeAllModals();
-				});
+				updateScheduleState();
 			});
+	}
+
+	function updateScheduleState() {
+		getSchedules().then((schedules) => {
+			schedules.sort((a, b) => {
+				if (a.enabled && !b.enabled) {
+					return -1;
+				}
+
+				if (moment(b.scheduledAt).diff(moment(a.scheduledAt)) === 0) {
+					return b.id - a.id;
+				}
+
+				return moment(b.scheduledAt).diff(moment(a.scheduledAt));
+			});
+
+			setSchedules(schedules);
+
+			closeAllModals();
+		});
 	}
 };
 

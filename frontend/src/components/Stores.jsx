@@ -11,7 +11,7 @@ import {
 	InlineStack,
 	Icon, InlineError,
 	Tooltip, DatePicker, Popover,
-	Select
+	Select, Layout, PageActions, SkeletonBodyText
 } from '@shopify/polaris';
 import {
 	createStoreV2,
@@ -35,7 +35,7 @@ import {
 	ThemeTemplateIcon
 } from '@shopify/polaris-icons';
 
-const Stores = () => {
+const Stores = (props) => {
 	const addStoreModalTitle = 'Add Store';
 	const editStoreModalTitle = 'Edit Store';
 	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', ''];
@@ -120,48 +120,83 @@ const Stores = () => {
 			/>
 	);
 
-	useEffect(() => {
-		getStores().then((stores) => {
-			setStores(stores);
-		});
-	}, []);
+	useEffect(updateStoreState, []);
 
 	return (
-		<Page title='Stores' primaryAction={
-			<Button variant='primary' onClick={ () => openModal('add') }>New</Button>
-		}>
+		<BlockStack title='Stores' gap='400'>
+			<InlineStack gap='400' align='space-between'>
+				<Text as='h2' variant="headingXl">
+					Shopify Stores
+				</Text>
+
+				<Button variant='primary' onClick={ () => openModal('add') }>Add Store</Button>
+			</InlineStack>
+
 			<BlockStack>
-				<DataTable
-						columnContentTypes={columnContentTypes}
-						headings={headings}
-						rows={stores.map((store) => {
-							return [
-								store?.name || 'N/A',
-								store?.url || 'N/A',
-								store?.owner || 'N/A',
-								store?.shopifyId || 'N/A',
-								<InlineStack gap="400" align='center'>
-									<Tooltip content='Schedule Theme'>
-										<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store, 'schedule') }>
-											<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
-										</Button>
-									</Tooltip>
+				{ stores.length !== 0 ? (
+						<DataTable
+								columnContentTypes={columnContentTypes}
+								headings={headings}
+								rows={stores.map((store) => {
+									return [
+										store?.name || 'N/A',
+										store?.url || 'N/A',
+										store?.owner || 'N/A',
+										store?.shopifyId || 'N/A',
+										<InlineStack gap="400" align='center' key={store.id}>
+											<Tooltip content='Schedule Theme'>
+												<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store, 'schedule') }>
+													<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
+												</Button>
+											</Tooltip>
 
-									<Tooltip content='Edit Store'>
-										<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store)}>
-											<Icon source={EditIcon} />
-										</Button>
-									</Tooltip>
+											<Tooltip content='Edit Store'>
+												<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store)}>
+													<Icon source={EditIcon} />
+												</Button>
+											</Tooltip>
 
-									<Tooltip content='Delete Store'>
-										<Button variant='plain' tone='critical' onClick={() => setSelectedStore(store, 'delete')}>
-											<Icon source={DeleteIcon} />
-										</Button>
-									</Tooltip>
-								</InlineStack>,
-							];
-						})}
-				/>
+											<Tooltip content='Delete Store'>
+												<Button variant='plain' tone='critical' onClick={() => setSelectedStore(store, 'delete')}>
+													<Icon source={DeleteIcon} />
+												</Button>
+											</Tooltip>
+										</InlineStack>,
+									];
+								})}
+						/>
+				) : (
+						<DataTable columnContentTypes={columnContentTypes} headings={headings} rows={
+							Array(5).fill(0).map(() => {
+								return headings.map(heading => {
+									if (heading === '') {
+										return <InlineStack gap="400" align='center' key={heading}>
+											<Tooltip content='Schedule Theme'>
+												<Button variant='plain' tone='primary' disabled>
+													<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
+												</Button>
+											</Tooltip>
+
+											<Tooltip content='Edit Store'>
+												<Button variant='plain' tone='primary' disabled>
+													<Icon source={EditIcon} />
+												</Button>
+											</Tooltip>
+
+											<Tooltip content='Delete Store'>
+												<Button variant='plain' tone='critical' disabled>
+													<Icon source={DeleteIcon} />
+												</Button>
+											</Tooltip>
+										</InlineStack>
+									}
+
+									return <SkeletonBodyText lines={1} key={heading} />;
+								});
+							})
+						} />
+				)}
+
 			</BlockStack>
 
 			<Modal open={ addStoreModal.modalActive } title={ addStoreModalTitle } onClose={ closeAllModals }>
@@ -386,7 +421,7 @@ const Stores = () => {
 			</Modal>
 
 			{ toastMarkup }
-		</Page>
+		</BlockStack>
 	);
 
 	function closeAllModals() {
@@ -498,9 +533,7 @@ const Stores = () => {
 
 			setToast({ active: true, content: 'Store Added!' })
 
-			getStores().then((stores) => {
-				setStores(stores);
-			});
+			updateStoreState();
 		});
 	}
 
@@ -522,9 +555,7 @@ const Stores = () => {
 
 			setToast({ active: true, content: 'Store Updated!' })
 
-			getStores().then((stores) => {
-				setStores(stores);
-			});
+			updateStoreState();
 		});
 	}
 
@@ -544,9 +575,7 @@ const Stores = () => {
 
 			setToast({ active: true, content: 'Store Deleted Successfully!' })
 
-			getStores().then((stores) => {
-				setStores(stores);
-			});
+			updateStoreState();
 		});
 	}
 
@@ -666,6 +695,8 @@ const Stores = () => {
 				error: ''
 			});
 
+			props.setUpdate(true);
+
 			setToast({ active: true, content: 'Theme Scheduled for Publish!' });
 		});
 	}
@@ -710,6 +741,16 @@ const Stores = () => {
 		 else {
 			 return messagePrefix + `${ diff } minute${diffMinutesSuffix} from now`;
 		 }
+	}
+
+	function updateStoreState() {
+		console.log('Updating stores...')
+
+		getStores().then((stores) => {
+			console.log('Stores: ', stores)
+
+			setStores(stores);
+		});
 	}
 };
 

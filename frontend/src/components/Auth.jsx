@@ -1,83 +1,121 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import {BlockStack, Text, Card, FormLayout, TextField, Button, InlineStack} from '@shopify/polaris';
+import {verifyLogin, logout} from "../utils";
 
 const AuthComponent = ({ mode }) => {
-	const [formData, setFormData] = useState({ username: '', password: '' });
+	const [formData, setFormData] = useState({
+		username: '',
+		password: ''
+	});
+	const [showPassword, setShowPassword] = useState(false);
+	const [verified, setVerified] = useState(false);
 	const navigate = useNavigate();
-	
-	const api = 'http://localhost:3000/auth'
-	
-	const handleChange = (e) => {
-		setFormData({ ...formData, [e.target.name]: e.target.value });
-	};
-	
+
+	const api = process.env.REACT_APP_API_HOST || 'http://localhost:3001/';
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		
+
 		try {
 			if (mode === 'register') {
-				const response = await axios.post(`${api}/register`, formData);
-				console.log('Registration successful:', response.data);
+				await axios.post(`${api}auth/register`, formData);
+
+				// TODO: Success Toast
 			}
-			
+
 			else {
-				const response = await axios.post(`${api}/login`, formData);
-				console.log('Login successful:', response.data);
-				
-				// Store the JWT token in local storage or cookies
+				const response = await axios.post(`${api}auth/login`, formData);
+
 				localStorage.setItem('token', response.data.token);
-				
-				// Redirect to a protected route (e.g., '/dashboard')
-				navigate('/dashboard');
+
+				navigate('/');
 			}
 		} catch (error) {
 			console.error('Authentication error:', error.response.data);
+
+			// TODO: Display error message and error toast
 		}
 	};
-	
-	// Check if the user is already logged in
+
 	useEffect(() => {
-		const token = localStorage.getItem('token');
-		
 		if (mode === 'logout') {
-			localStorage.removeItem('token');
-			console.log('Logged out');
-			navigate('/');
+			logout().then(() => {
+				navigate('/login');
+			})
 		}
-		
-		if (token) {
-			navigate('/dashboard');
-		}
-	});
-	
+
+		verifyLogin().then((role) => {
+			if (role) {
+				if (mode === 'login') {
+					navigate('/');
+				}
+			}
+
+			if (mode === 'register' && role !== 'admin') {
+				navigate('/');
+			}
+
+			setVerified(true);
+		});
+	}, []);
+
 	return (
-		<div>
-			<h2>{mode === 'register' ? 'Register' : 'Login'}</h2>
-			<form onSubmit={handleSubmit}>
-				<div>
-					<label htmlFor="username">Username</label>
-					<input
-						type="text"
-						id="username"
-						name="username"
-						value={formData.username}
-						onChange={handleChange}
-					/>
-				</div>
-				<div>
-					<label htmlFor="password">Password</label>
-					<input
-						type="password"
-						id="password"
-						name="password"
-						value={formData.password}
-						onChange={handleChange}
-					/>
-				</div>
-				<button type="submit">{mode === 'register' ? 'Register' : 'Login'}</button>
-			</form>
-		</div>
+		<Card>
+			{
+				verified ? (
+						<BlockStack gap='400'>
+							<Text as='h2' variant='headingLg'>
+								{mode === 'register' ? 'Register User' : 'Login'}
+							</Text>
+
+							<FormLayout>
+								<TextField
+										label='Username'
+										autoComplete='off'
+										value={formData.username}
+										onChange={(value) => {
+											setFormData({
+												...formData,
+												username: value
+											})
+										}}
+								/>
+
+								<TextField
+										label='Password'
+										type={showPassword ? 'text' : 'password'}
+										autoComplete='off'
+										suffix={
+											<Button variant='plain' onClick={() => setShowPassword(!showPassword)}>
+												{ showPassword ? 'Hide' : 'Show' }
+											</Button>
+										}
+										value={formData.password}
+										onChange={(value) => {
+											setFormData({
+												...formData,
+												password: value
+											})
+										}}
+								/>
+							</FormLayout>
+
+							<InlineStack>
+								<Button variant='primary' onClick={handleSubmit}>
+									{mode === 'register' ? 'Register User' : 'Login'}
+								</Button>
+							</InlineStack>
+
+						</BlockStack>
+				) : (
+						<Text as='p'>Loading...</Text>
+				)
+			}
+
+
+		</Card>
 	);
 };
 

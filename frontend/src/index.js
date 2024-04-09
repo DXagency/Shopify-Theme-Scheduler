@@ -32,13 +32,12 @@ root.render(
 
               <Layout.Section>
                 <Routes>
-                  <Route path="/" element={ <Stores /> } />
-                  <Route path="/login" element={ <Login /> } />
+                  <Route path="/" element={ <Home /> } />
+                  <Route path="/login" element={ <AuthComponent mode="login" /> } />
                   <Route path="/logout" element={ <AuthComponent mode="logout" /> } />
                   <Route path="/register" element={ <AuthComponent mode="register" /> } />
                   <Route path="/stores" element={ <Stores /> } />
                   <Route path="/schedules" element={ <Schedules /> } />
-                  <Route path="/accounts" element={ <Accounts /> } />
                 </Routes>
               </Layout.Section>
             </Layout>

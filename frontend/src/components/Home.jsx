@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifyLogin } from '../utils';
-import { Tabs, Card } from '@shopify/polaris';
+import {Tabs, Card, BlockStack} from '@shopify/polaris';
 import Stores from './Stores';
 import Schedules from "./Schedules";
 import Accounts from "./Accounts";
@@ -11,19 +11,29 @@ import '../app.scss'
 const Home = () => {
 	const navigate = useNavigate();
 
+	const [update, setUpdate] = useState(false);
+
 	useEffect(() => {
 		verifyLogin(navigate)
-			.then((isVerified) => {
-				if (!isVerified) {
+			.then((role) => {
+				if (!role) {
 					navigate('/login');
 				}
 			});
-
-		return () => {}
 	}, []);
 
+	useEffect(() => {
+		if (update) {
+			setUpdate(false);
+		}
+	}, [update]);
+
 	return (
-			<Card></Card>
+			<BlockStack align='center' gap='800'>
+				<Stores setUpdate={setUpdate} />
+
+				<Schedules update={update} />
+			</BlockStack>
 	);
 };
 

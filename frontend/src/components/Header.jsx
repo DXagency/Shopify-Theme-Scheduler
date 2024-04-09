@@ -3,24 +3,13 @@ import {InlineStack, Text} from '@shopify/polaris';
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {verifyLogin} from "../utils";
 
+import logo from '../assets/logo.svg';
+
 const Header = () => {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const navigationItems = [
-		{
-			label: 'Stores',
-			path: '/stores'
-		},
-		{
-			label: 'Schedules',
-			path: '/schedules'
-		},
-		{
-			label: 'Accounts',
-			path: '/accounts'
-		}
-	];
+	const navigationItems = [];
 	const navigationElements = navigationItems.map((item, index) => {
 		return (
 			<Link to={item.path} monochrome removeUnderline key={index}
@@ -45,8 +34,8 @@ const Header = () => {
 	}, []);
 
 	return (
-		<InlineStack align='center' gap='400'>
-			{ navigationElements }
+		<InlineStack align='center' gap='400' blockAlign='center'>
+			<img src={logo} alt='logo' />
 		</InlineStack>
 	);
 };

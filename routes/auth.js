@@ -111,7 +111,6 @@ function initializeAuthRouter(Users) {
 	router.post('/register', async (req, res) => {
 		try {
 			const errors = validationResult(req);
-			console.log("errors", errors);
 
 			if (!errors.isEmpty()) {
 				logError('Error registering user', errors.array());
@@ -119,9 +118,6 @@ function initializeAuthRouter(Users) {
 			}
 
 			const { username, password, email } = req.body;
-			console.log("username", username);
-			console.log("password", password);
-			console.log("email", email);
 
 			if (!username || !password) {
 				return res.status(400).json({ error: 'Username and password are required' });
@@ -139,8 +135,6 @@ function initializeAuthRouter(Users) {
 					logError('Error hashing password', hashErr);
 					return res.status(500).json({ error: 'Error hashing password', raw: hashErr });
 				}
-
-				console.log("hashedPassword", hashedPassword);
 
 				const user = await Users.create({
 					username, password:
@@ -161,16 +155,22 @@ function initializeAuthRouter(Users) {
 
 	router.get('/verify', authenticateMiddleware, (req, res) => {
 		log("GET /verify", 'yellow');
-		res.json({ success: true, message: 'Authenticated successfully' });
+
+		res.json({ success: true, message: 'Authenticated successfully', role: req?.user?.role});
 	});
 
 	router.get('/logout', (req, res) => {
 		log("GET /logout", 'yellow');
 
-		req.logout();
 		res.clearCookie(COOKIE_NAME);
 
-		return res.json({ success: true });
+		req.logout((err) => {
+			if (err) {
+				return res.status(500).json({ success: false, error: 'Error logging out', raw: err });
+			}
+
+			return res.json({ success: true });
+		});
 	});
 
 	return { authRouter: router, passport, authenticateMiddleware }

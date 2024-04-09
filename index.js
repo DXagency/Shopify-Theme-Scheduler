@@ -25,14 +25,27 @@ const DATABASE_CONFIG = {
     port: process.env.DB_PORT,
     dialect: 'postgres',
 }
-const DATABASE_CLIENT = new Client({
+const DATABASE_CLIENT = new Client(process.env.DATABASE_URL ? {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+} : {
     user: DATABASE_CONFIG.user,
     host: DATABASE_CONFIG.host,
     database: DATABASE_CONFIG.database,
     password: DATABASE_CONFIG.password,
     port: DATABASE_CONFIG.port,
 });
-const SEQUELIZE = new Sequelize(DATABASE_CONFIG.database, DATABASE_CONFIG.user, DATABASE_CONFIG.password, {
+const SEQUELIZE = process.env.DATABASE_URL ? new Sequelize(process.env.DATABASE_URL, {
+    logging: false,
+    dialectOptions: {
+        ssl: {
+            require: true,
+            rejectUnauthorized: false // <<<<<<< YOU NEED THIS
+        }
+    },
+}): new Sequelize(DATABASE_CONFIG.database, DATABASE_CONFIG.user, DATABASE_CONFIG.password, {
     host: DATABASE_CONFIG.host,
     dialect: DATABASE_CONFIG.dialect,
     port: DATABASE_CONFIG.port,
