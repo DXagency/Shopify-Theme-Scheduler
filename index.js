@@ -27,9 +27,7 @@ const DATABASE_CONFIG = {
 }
 const DATABASE_CLIENT = new Client(process.env.DATABASE_URL ? {
     connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false }
 } : {
     user: DATABASE_CONFIG.user,
     host: DATABASE_CONFIG.host,
