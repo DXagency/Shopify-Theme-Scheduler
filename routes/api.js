@@ -14,18 +14,18 @@ const scheduleJobs = [];
 
 function initializeApiRoutes(models) {
 	// On mount, check if there are any schedules that need cron jobs
-	models.Schedule.findAll({ where: { enabled: true } })
-		.then((schedules) => {
-			schedules.forEach((schedule) => {
-				const job = createCronJobV2(schedule, models);
-
-				if (!job?.error)
-					scheduleJobs.push({
-						id: schedule?.id || null,
-						cronJob: job
-					});
-			});
-	});
+	// models.Schedule.findAll({ where: { enabled: true } })
+	// 	.then((schedules) => {
+	// 		schedules.forEach((schedule) => {
+	// 			const job = createCronJobV2(schedule, models);
+	//
+	// 			if (!job?.error)
+	// 				scheduleJobs.push({
+	// 					id: schedule?.id || null,
+	// 					cronJob: job
+	// 				});
+	// 		});
+	// });
 
 	router.get('/hello', (req, res) => {
 		res.send({ message: 'Hello World!'});

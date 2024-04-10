@@ -94,7 +94,7 @@ async function connectDatabase() {
 
     async function syncModels() {
         try {
-            await SEQUELIZE.sync({ force: true, alter: true, logging: false })
+            await SEQUELIZE.sync({ force: false, alter: true, logging: false })
         }
 
         catch(error) {
