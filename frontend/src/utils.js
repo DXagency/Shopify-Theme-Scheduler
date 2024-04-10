@@ -1,4 +1,4 @@
-const SERVER = process.env.REACT_APP_API_HOST || 'http://localhost:3001/';
+const SERVER = process.env.NODE_ENV === 'development' ? 'http://localhost:3000/' : '/';
 const API = {
 	auth_verify: SERVER + 'auth/verify',
 	auth_login: SERVER + 'auth/login',
