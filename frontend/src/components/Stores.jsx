@@ -3,16 +3,28 @@ import {
 	Toast,
 	DataTable,
 	BlockStack,
-	Page,
 	Button,
 	Modal,
 	FormLayout,
 	TextField,
 	InlineStack,
 	Icon, InlineError,
-	Tooltip, DatePicker, Popover,
-	Select, Layout, PageActions, SkeletonBodyText
+	Tooltip,
+	DatePicker,
+	Popover,
+	Select,
+	SkeletonBodyText,
+	Card
 } from '@shopify/polaris';
+import {
+	CalendarTimeIcon,
+	CalendarIcon,
+	ClockIcon,
+	DeleteIcon,
+	EditIcon,
+	ThemeTemplateIcon,
+	LiveIcon
+} from '@shopify/polaris-icons';
 import {
 	createStoreV2,
 	deleteStore,
@@ -24,23 +36,12 @@ import {
 import React, { useState, useEffect } from 'react';
 import moment from "moment";
 
-import {
-	CalendarTimeIcon,
-	CalendarIcon,
-	ClockIcon,
-	DeleteIcon,
-	EditIcon,
-	ViewIcon,
-	HideIcon,
-	ThemeTemplateIcon
-} from '@shopify/polaris-icons';
-
 const Stores = (props) => {
+	const defaultDaysOffset = 31;
 	const addStoreModalTitle = 'Add Store';
 	const editStoreModalTitle = 'Edit Store';
-	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', ''];
 	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
-	const defaultOffset = 31;
+	const headings = ['Store Name', 'URL', 'Store Owner', 'Store ID', ''];
 
 	const [stores, setStores] = useState([]);
 	const [addStoreModal, setAddStoreModal] = useState({
@@ -66,9 +67,12 @@ const Stores = (props) => {
 		error: '',
 		scheduledAtMessage: ''
 	});
-	const [toast, setToast] = useState({
-		active: false,
-		content: ''
+	const [liveThemeModal, setLiveThemeModal] = useState({
+		modalActive: false,
+		store: {},
+		theme: '',
+		error: '',
+		loading: false
 	});
 	const [selectedDate, setSelectedDate] = useState({
 		month: moment().month(),
@@ -78,12 +82,12 @@ const Stores = (props) => {
 		datePickerActive: false
 	});
 	const [selectedTime, setSelectedTime] = useState({
-		hour: moment().add(defaultOffset, 'minutes').format('h'),
-		hour24: moment().add(defaultOffset, 'minutes').format('HH'),
-		minute: moment().add(defaultOffset, 'minutes').format('m'),
-		meridiem: moment().add(defaultOffset, 'minutes').format('A'),
-		selectedText: moment().add(defaultOffset, 'minutes').format('hh:mm A'),
-		time24: moment().add(defaultOffset, 'minutes').format('HH:MM'),
+		hour: moment().add(defaultDaysOffset, 'minutes').format('h'),
+		hour24: moment().add(defaultDaysOffset, 'minutes').format('HH'),
+		minute: moment().add(defaultDaysOffset, 'minutes').format('m'),
+		meridiem: moment().add(defaultDaysOffset, 'minutes').format('A'),
+		selectedText: moment().add(defaultDaysOffset, 'minutes').format('hh:mm A'),
+		time24: moment().add(defaultDaysOffset, 'minutes').format('HH:MM'),
 		timePickerActive: false
 	});
 	const [selectedTheme, setSelectedTheme] = useState({
@@ -91,13 +95,17 @@ const Stores = (props) => {
 		options: [],
 		loading: false
 	});
-
-	const toastMarkup = toast.active ? (
-			<Toast
-				content={toast.content}
-				onDismiss={ () => setToast({ active: false, content: '' })}
-		/>
-	) : null;
+	const [toast, setToast] = useState({
+		active: false,
+		content: '',
+		error: false
+	});
+	const [loading, setLoading] = useState(true);
+	const [pagination, setPagination] = useState({
+		page: 1,
+		rowsPerPage: 5,
+		rows: []
+	});
 
 	const selectDateActivator = (
 			<TextField
@@ -120,7 +128,15 @@ const Stores = (props) => {
 			/>
 	);
 
-	useEffect(updateStoreState, []);
+	const toastMarkup = toast.active ? (
+		<Toast
+				content={toast.content}
+				error={toast.error}
+				onDismiss={ () => setToast({ active: false, content: '', error: false })}
+		/>
+	) : null;
+
+	useEffect(refreshStoreState, []);
 
 	return (
 		<BlockStack title='Stores' gap='400'>
@@ -133,11 +149,24 @@ const Stores = (props) => {
 			</InlineStack>
 
 			<BlockStack>
-				{ stores.length !== 0 ? (
+				{ !loading ? stores.length === 0 ?
+					(
+						<Card>
+							<BlockStack gap='200'>
+								<Text as='h2' variant='bodyLg'>
+									No stores found, add a new store to get started!
+								</Text>
+
+								<InlineStack>
+									<Button variant='primary' onClick={ () => openModal('add') }>Add Store</Button>
+								</InlineStack>
+							</BlockStack>
+						</Card>
+					) : (
 						<DataTable
 								columnContentTypes={columnContentTypes}
 								headings={headings}
-								rows={stores.map((store) => {
+								rows={pagination.rows.map((store) => {
 									return [
 										store?.name || 'N/A',
 										store?.url || 'N/A',
@@ -147,6 +176,16 @@ const Stores = (props) => {
 											<Tooltip content='Schedule Theme'>
 												<Button variant='plain' tone='primary' onClick={ () => setSelectedStore(store, 'schedule') }>
 													<Icon source={CalendarTimeIcon} accessibilityLabel='Schedule Theme' />
+												</Button>
+											</Tooltip>
+
+											<Tooltip content='View Live Theme'>
+												<Button variant='plain'
+														tone='primary'
+														onClick={ () => setSelectedStore(store, 'live')}
+														loading={liveThemeModal.loading}
+												>
+													<Icon source={LiveIcon} />
 												</Button>
 											</Tooltip>
 
@@ -164,8 +203,16 @@ const Stores = (props) => {
 										</InlineStack>,
 									];
 								})}
+								pagination={ stores.length > pagination.rowsPerPage ? {
+									label: `Page ${pagination.page} of ${Math.ceil(stores.length / pagination.rowsPerPage)}`,
+									hasPrevious: pagination.page > 1,
+									hasNext: pagination.page < Math.ceil(stores.length / pagination.rowsPerPage),
+									onPrevious: () => handlePagination('prev'),
+									onNext: () => handlePagination('next')
+								} : false}
 						/>
-				) : (
+					)
+				: (
 						<DataTable columnContentTypes={columnContentTypes} headings={headings} rows={
 							Array(5).fill(0).map(() => {
 								return headings.map(heading => {
@@ -420,6 +467,21 @@ const Stores = (props) => {
 				</Modal.Section>
 			</Modal>
 
+			<Modal size='small' title='Current Live Theme' titleHidden
+				 open={ liveThemeModal.modalActive }
+				 onClose={ closeAllModals }
+				 primaryAction={{
+					 content: 'Close',
+					 onAction: closeAllModals
+				 }}
+			>
+				<Modal.Section>
+					<Text as='h3'>
+						Current Live Theme is <strong>{ liveThemeModal.theme.name }</strong>
+					</Text>
+				</Modal.Section>
+			</Modal>
+
 			{ toastMarkup }
 		</BlockStack>
 	);
@@ -455,6 +517,15 @@ const Stores = (props) => {
 			scheduledAtMessage: ''
 		});
 
+		setLiveThemeModal({
+			...liveThemeModal,
+			modalActive: false,
+			store: {},
+			theme: '',
+			error: '',
+			loading: false
+		});
+
 		// Reset selected date and time to 30 minutes from now
 		setSelectedDate({
 			...selectedDate,
@@ -463,12 +534,12 @@ const Stores = (props) => {
 
 		setSelectedTime({
 			...selectedTime,
-			hour: moment().add(defaultOffset, 'minutes').format('h'),
-			hour24: moment().add(defaultOffset, 'minutes').format('HH'),
-			minute: moment().add(defaultOffset, 'minutes').format('m'),
-			meridiem: moment().add(defaultOffset, 'minutes').format('A'),
-			selectedText: moment().add(defaultOffset, 'minutes').format('hh:mm A'),
-			time24: moment().add(defaultOffset, 'minutes').format('HH:MM'),
+			hour: moment().add(defaultDaysOffset, 'minutes').format('h'),
+			hour24: moment().add(defaultDaysOffset, 'minutes').format('HH'),
+			minute: moment().add(defaultDaysOffset, 'minutes').format('m'),
+			meridiem: moment().add(defaultDaysOffset, 'minutes').format('A'),
+			selectedText: moment().add(defaultDaysOffset, 'minutes').format('hh:mm A'),
+			time24: moment().add(defaultDaysOffset, 'minutes').format('HH:MM'),
 		});
 	}
 
@@ -531,9 +602,9 @@ const Stores = (props) => {
 				error: ''
 			});
 
-			setToast({ active: true, content: 'Store Added!' })
+			setToast({ ...toast, active: true, content: 'Store Added!' })
 
-			updateStoreState();
+			refreshStoreState();
 		});
 	}
 
@@ -553,9 +624,9 @@ const Stores = (props) => {
 				error: ''
 			});
 
-			setToast({ active: true, content: 'Store Updated!' })
+			setToast({ ...toast, active: true, content: 'Store Updated!' })
 
-			updateStoreState();
+			refreshStoreState();
 		});
 	}
 
@@ -573,9 +644,9 @@ const Stores = (props) => {
 				store: {}
 			});
 
-			setToast({ active: true, content: 'Store Deleted Successfully!' })
+			setToast({ ...toast, active: true, content: 'Store Deleted Successfully!' })
 
-			updateStoreState();
+			refreshStoreState();
 		});
 	}
 
@@ -589,7 +660,6 @@ const Stores = (props) => {
 		}
 
 		else if (modal === 'schedule') {
-
 			setCreateScheduleModal({
 				...createScheduleModal,
 				store: store,
@@ -615,6 +685,32 @@ const Stores = (props) => {
 					loading: false,
 					theme: optionsMapped.find(theme => theme.disabled === false)?.value
 				});
+			});
+		}
+
+		else if (modal === 'live') {
+			setLiveThemeModal({
+				...liveThemeModal,
+				store: store,
+				loading: true
+			})
+
+			getThemes(store.id).then((themes) => {
+				const liveTheme = themes.find(theme => theme.role === 'main');
+
+				if (!liveTheme) {
+					setToast({ active: true, content: 'No live theme found for this store', error: true });
+
+					return;
+				}
+
+				setLiveThemeModal(prev => {
+					return {
+					...prev,
+					modalActive: true,
+					theme: liveTheme,
+					loading: false
+				}})
 			});
 		}
 	}
@@ -743,14 +839,35 @@ const Stores = (props) => {
 		 }
 	}
 
-	function updateStoreState() {
-		console.log('Updating stores...')
-
+	function refreshStoreState() {
 		getStores().then((stores) => {
-			console.log('Stores: ', stores)
+			setLoading(false);
 
+			setPagination(val => {
+				return {
+					...val,
+					page: 1,
+					rows: getPaginatedRows(stores, 1, val.rowsPerPage)
+				}
+			});
 			setStores(stores);
+
+			closeAllModals();
 		});
+	}
+
+	function getPaginatedRows(rows, page, rowsPerPage) {
+		const start = (page - 1) * rowsPerPage;
+		const end = start + rowsPerPage;
+
+		return rows.slice(start, end);
+	}
+
+	function handlePagination(direction = 'next') {
+		const page = pagination.page + (direction === 'next' ? 1 : -1);
+		const rows = getPaginatedRows(stores, page, pagination.rowsPerPage);
+
+		setPagination({ ...pagination, page, rows });
 	}
 };
 

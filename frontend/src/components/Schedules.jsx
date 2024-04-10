@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
 	BlockStack,
 	Button,
@@ -8,28 +8,26 @@ import {
 	Text,
 	Tooltip,
 	Modal,
-	FormLayout, InlineError,
-	SkeletonBodyText
+	FormLayout,
+	InlineError,
+	SkeletonBodyText, Card, SkeletonDisplayText
 } from '@shopify/polaris';
-import { getSchedules, updateScheduleAction } from '../utils';
-
 import {
 	PlayCircleIcon,
 	StopCircleIcon
 } from '@shopify/polaris-icons';
-
 import moment from 'moment';
+import { getSchedules, updateScheduleAction } from '../utils';
 
 const Schedules = (props) => {
-	const headings = ['', 'Store Name', 'Theme', 'Scheduled At', 'Status'];
-	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
 	const startTitle = 'Start Schedule';
 	const stopTitle = 'Stop Schedule';
 	const pageTitle = 'Schedules';
 	const updateScheduleActionTitle = 'Update Schedule Action';
+	const headings = ['', 'Store Name', 'Theme', 'Scheduled At', 'Status'];
+	const columnContentTypes = ['text', 'text', 'text', 'text', 'text'];
 
 	const [schedules, setSchedules] = useState([]);
-	const [isSchedulesEmpty, setIsSchedulesEmpty] = useState(false);
 	const [updateActionModal, setUpdateActionModal] = useState({
 		active: false,
 		schedule: {},
@@ -37,12 +35,18 @@ const Schedules = (props) => {
 		action: '',
 		error: ''
 	});
+	const [loading, setLoading] = useState(true);
+	const [pagination, setPagination] = useState({
+		page: 1,
+		rowsPerPage: 5,
+		rows: []
+	});
 
-	useEffect(updateScheduleState, []);
+	useEffect(refreshScheduleState, []);
 
 	useEffect(() => {
 		if (props.update) {
-			updateScheduleState();
+			refreshScheduleState();
 		}
 	}, [props]);
 
@@ -55,11 +59,11 @@ const Schedules = (props) => {
 						</Text>
 					</InlineStack>
 
-					{ schedules.length !== 0 ? (
+					{ !loading ? schedules.length !== 0 ? (
 							<DataTable
 									columnContentTypes={columnContentTypes}
 									headings={headings}
-									rows={schedules.map(schedule => {
+									rows={pagination.rows.map(schedule => {
 										return [
 											<InlineStack gap='100' key={schedule.id}>
 												{ schedule?.enabled ? (
@@ -93,13 +97,35 @@ const Schedules = (props) => {
 											schedule?.enabled ? 'Enabled' : 'Stopped'
 										];
 									})}
+									pagination={ schedules.length > pagination.rowsPerPage ? {
+										label: `Page ${pagination.page} of ${Math.ceil(schedules.length / pagination.rowsPerPage)}`,
+										hasPrevious: pagination.page > 1,
+										hasNext: pagination.page < Math.ceil(schedules.length / pagination.rowsPerPage),
+										onPrevious: () => handlePagination('prev'),
+										onNext: () => handlePagination('next')
+									} : false}
+									sortable={[false, true, false, true, true]}
+									onSort={handleSort}
 							/>
 					) : (
-							<DataTable columnContentTypes={columnContentTypes} headings={headings} rows={
-								Array(20).fill(0).map(() => {
-									return headings.map(heading => <SkeletonBodyText lines={1} key={heading} />);
+							<Card>
+								<BlockStack gap='200'>
+									<Text as='h2' variant='bodyLg'>
+										No schedules found, create one to get started!
+									</Text>
+								</BlockStack>
+							</Card>
+					)
+					: (
+						<DataTable
+							columnContentTypes={columnContentTypes}
+							headings={headings}
+							rows={
+								Array(pagination.rowsPerPage).fill(0).map(() => {
+									return headings.map(heading => <SkeletonDisplayText maxWidth='100%' size='small' key={heading} />);
 								})
-							} />
+							}
+						/>
 					)}
 				</BlockStack>
 
@@ -167,11 +193,11 @@ const Schedules = (props) => {
 					return;
 				}
 
-				updateScheduleState();
+				refreshScheduleState();
 			});
 	}
 
-	function updateScheduleState() {
+	function refreshScheduleState() {
 		getSchedules().then((schedules) => {
 			schedules.sort((a, b) => {
 				if (a.enabled && !b.enabled) {
@@ -185,9 +211,51 @@ const Schedules = (props) => {
 				return moment(b.scheduledAt).diff(moment(a.scheduledAt));
 			});
 
+			setLoading(false);
+			setPagination({
+				...pagination,
+				page: 1,
+				rows: getPaginatedRows(schedules, 1, pagination.rowsPerPage)
+			});
 			setSchedules(schedules);
 
 			closeAllModals();
+		});
+	}
+
+	function getPaginatedRows(rows, page, rowsPerPage) {
+		const start = (page - 1) * rowsPerPage;
+		const end = start + rowsPerPage;
+
+		return rows.slice(start, end);
+	}
+
+	function handlePagination(direction = 'next') {
+		const page = pagination.page + (direction === 'next' ? 1 : -1);
+		const rows = getPaginatedRows(schedules, page, pagination.rowsPerPage);
+
+		setPagination({ ...pagination, page, rows });
+	}
+
+	function handleSort(index, direction) {
+		const sortedSchedules = schedules.sort((a, b) => {
+			switch (index) {
+				case 1:
+					return direction === 'ascending' ? a.storeName.localeCompare(b.storeName) : b.storeName.localeCompare(a.storeName);
+				case 3:
+					return direction === 'ascending' ? moment(a.scheduledAt).diff(moment(b.scheduledAt)) : moment(b.scheduledAt).diff(moment(a.scheduledAt));
+				case 4:
+					return direction === 'ascending' ? a.enabled - b.enabled : b.enabled - a.enabled;
+				default:
+					return 0;
+			}
+		})
+
+		setSchedules(sortedSchedules);
+		setPagination({
+			...pagination,
+			page: 1,
+			rows: getPaginatedRows(sortedSchedules, 1, pagination.rowsPerPage)
 		});
 	}
 };

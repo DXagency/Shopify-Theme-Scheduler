@@ -79,8 +79,6 @@ export const createStore = async (formData) => {
 
 		const data = await response.json();
 
-		console.log("data", data);
-
 		if (data?.error) {
 			console.log('Error creating store: ', data.error);
 			return { error: data.error };
@@ -178,8 +176,6 @@ export const getStores = async () => {
 
 		const data = await response.json();
 
-		console.log("data", data);
-
 		return data?.stores || []
 	}
 
@@ -197,8 +193,6 @@ export const getThemes = async (id) => {
 		})
 
 		const data = await response.json();
-
-		console.log("data", data);
 
 		return data?.themes || []
 	}
@@ -226,8 +220,6 @@ export const getStoreById = async (id) => {
 		return null;
 	}
 }
-
-// Returns shedule and scheduleError todo: add jsdoc
 
 /**
  * @param formData

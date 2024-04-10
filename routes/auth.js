@@ -26,18 +26,6 @@ const jwtOptions = {
 	secretOrKey: process.env.SECRET || crypto.randomBytes(32).toString('hex')
 }
 
-function signToken(payload) {
-	return new Promise((resolve, reject) => {
-		jwt.sign(payload, jwtOptions.secretOrKey, { expiresIn: JWT_EXPIRY }, (err, token) => {
-			if (err) {
-				reject(err);
-			} else {
-				resolve(token);
-			}
-		});
-	});
-}
-
 function initializeAuthRouter(Users) {
 	passport.use(JWT_STRATEGY_NAME, new JwtStrategy(jwtOptions, async (payload, done) => {
 		log("verifying token", 'yellow');
@@ -74,30 +62,69 @@ function initializeAuthRouter(Users) {
 	router.post('/login', async (req, res) => {
 		try {
 			const errors = validationResult(req);
-			console.log("errors", errors);
 
 			if (!errors.isEmpty()) {
-				logError('Error registering user', errors.array());
-				return res.status(400).json({ errors: errors.array() });
+				logError('ValidationResult errors: ', errors.array());
+
+				return res.status(400).json({
+					errors: errors.array(),
+					errorType: "unknownError"
+				});
 			}
 
 			const { username, password } = req.body;
-			console.log("username", username);
-			console.log("password", password);
 
-			// Find the user in your database
+			if(!username) {
+				logError('Username not provided');
+
+				return res.status(400).json({
+					error: 'Username is required',
+					errorType: "usernameError"
+				});
+			}
+
+			if(!password) {
+				logError('Password not provided');
+
+				return res.status(400).json({
+					error: 'Password is required',
+					errorType: "passwordError"
+				});
+			}
+
 			const user = await Users.findOne({ where: { username } });
 
-			if (!user)
-				return res.status(404).json({ success: false, error: 'User not found' });
+			if (!user) {
+				logError('User not found')
+
+				return res.status(404).json({
+					success: false,
+					error: 'User not found',
+					errorType: "usernameError"
+				});
+			}
 
 			// Check if the password matches
 			bcrypt.compare(password, user.password, async (compareError, result) => {
-				if (compareError)
-					return res.status(500).json({ success: false, error: 'Error comparing passwords', raw: compareError });
+				if (compareError) {
+					logError('Error comparing passwords: ', compareError);
 
-				if (!result)
-					return res.status(401).json({ success: false, error: 'Incorrect password' });
+					return res.status(500).json({
+						success: false,
+						error: compareError,
+						errorType: "unknownError"
+					});
+				}
+
+				if (!result) {
+					logError('Incorrect password');
+
+					return res.status(401).json({
+						success: false,
+						error: 'Incorrect username or password',
+						errorType: "formError"
+					});
+				}
 
 				await generateTokenAndHandleResponse(user, res);
 			});
@@ -114,42 +141,99 @@ function initializeAuthRouter(Users) {
 
 			if (!errors.isEmpty()) {
 				logError('Error registering user', errors.array());
-				return res.status(400).json({ errors: errors.array() });
+
+				return res.status(400).json({
+					errors: errors.array() ,
+					errorType: "unknownError"
+				});
 			}
 
-			const { username, password, email } = req.body;
+			const { username, password, email, role } = req.body;
 
-			if (!username || !password) {
-				return res.status(400).json({ error: 'Username and password are required' });
+			if (!username) {
+				logError('Username not provided');
+
+				return res.status(400).json({
+					error: 'Username is required',
+					errorType: "usernameError"
+				});
+			}
+
+			if (!password) {
+				logError('Password not provided');
+
+				return res.status(400).json({
+					error: 'Password is required',
+					errorType: "passwordError"
+				});
 			}
 
 			// Check if the user already exists
 			const user = await Users.findOne({ where: { username } });
 
-			if (user)
-				return res.status(400).json({ error: 'User already exists' });
+			if (user) {
+				logError('User already exists');
+
+				return res.status(400).json({
+					error: 'User already exists',
+					errorType: "usernameError"
+				});
+			}
 
 			// Hash the password before saving it
 			bcrypt.hash(password, 10, async (hashErr, hashedPassword) => {
 				if (hashErr) {
 					logError('Error hashing password', hashErr);
-					return res.status(500).json({ error: 'Error hashing password', raw: hashErr });
+
+					return res.status(500).json({
+						error: 'Error hashing password',
+						raw: hashErr,
+						errorType: "unknownError"
+					});
 				}
 
 				const user = await Users.create({
-					username, password:
-					hashedPassword,
-					email
+					username,
+					password: hashedPassword,
+					email,
+					role: role || 'user'
 				}).catch((err) => {
-					return res.status(500).json({ success: false, error: 'Error creating user', raw: err.message });
+					logError('Error creating user', err.message)
+
+					return res.status(500).json({
+						success: false,
+						error: 'Error creating user',
+						raw: err.message,
+						errorType: "unknownError"
+					});
 				});
 
-				await generateTokenAndHandleResponse(user, res);
+				if (!user) {
+					logError('Error creating user');
+
+					return res.status(500).json({
+						success: false,
+						error: 'Error creating user',
+						errorType: "unknownError"
+					});
+				}
+
+				return res.json({
+					success: true,
+					message: "User registered successfully"
+				});
 			});
 		}
 
 		catch (err) {
-			return res.status(500).json({ success: false, error: 'Error registering user', raw: err });
+			logError('Error registering user', err.message)
+
+			return res.status(500).json({
+				success: false,
+				error: 'Error registering user',
+				raw: err,
+				errorType: "unknownError"
+			});
 		}
 	});
 
@@ -174,25 +258,59 @@ function initializeAuthRouter(Users) {
 	});
 
 	return { authRouter: router, passport, authenticateMiddleware }
+}
 
-	async function generateTokenAndHandleResponse(user, res) {
-		try {
-			const token = await signToken({ id: user.id });
+async function generateTokenAndHandleResponse(user, res) {
+	try {
+		const token = await signToken({ id: user.id });
 
-			res.cookie(COOKIE_NAME, token, {
-				httpOnly: true,
-				secure: true,
-				sameSite: 'strict',
-				maxAge: COOKIE_MAX_AGE
+		if (!token) {
+			logError('Error generating token');
+
+			return res.status(500).json({
+				success: false,
+				error: 'Error generating token',
+				errorType: "unknownError"
 			});
-
-			log("User logged in successfully", 'green')
-
-			return res.json({ success: true, message: "Logged in successfully" });
-		} catch (err) {
-			return res.status(500).json({ success: false, error: 'Error occurred', raw: err.message });
 		}
+
+		res.cookie(COOKIE_NAME, token, {
+			httpOnly: true,
+			secure: true,
+			sameSite: 'strict',
+			maxAge: COOKIE_MAX_AGE
+		});
+
+		log("User logged in successfully", 'green')
+
+		return res.json({
+			success: true,
+			message: "Logged in successfully"
+		});
 	}
+
+	catch (err) {
+		logError('Error caught generating token', err.message);
+
+		return res.status(500).json({
+			success: false,
+			error: 'Error caught generating token',
+			raw: err.message,
+			errorType: "unknownError"
+		});
+	}
+}
+
+function signToken(payload) {
+	return new Promise((resolve, reject) => {
+		jwt.sign(payload, jwtOptions.secretOrKey, { expiresIn: JWT_EXPIRY }, (err, token) => {
+			if (err) {
+				reject(err);
+			} else {
+				resolve(token);
+			}
+		});
+	});
 }
 
 module.exports = { initializeAuthRouter };

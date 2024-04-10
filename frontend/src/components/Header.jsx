@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {InlineStack, Text} from '@shopify/polaris';
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {verifyLogin} from "../utils";
-
-import logo from '../assets/logo.svg';
 
 const Header = () => {
 	const navigate = useNavigate();
@@ -12,8 +10,8 @@ const Header = () => {
 	const navigationItems = [];
 	const navigationElements = navigationItems.map((item, index) => {
 		return (
-			<Link to={item.path} monochrome removeUnderline key={index}
-				className={location.pathname === item.path ? 'active' : ''}
+			<Link monochrome removeUnderline to={item.path} key={index}
+					className={location.pathname === item.path ? 'active' : ''}
 			>
 				<Text as='span' tone={location.pathname === item.path ? 'critical' : 'magic'}>
 					{item.label}
@@ -22,20 +20,9 @@ const Header = () => {
 		);
 	});
 
-	useEffect(() => {
-		verifyLogin(navigate)
-				.then((isVerified) => {
-					if (!isVerified) {
-						navigate('/login');
-					}
-				});
-
-		return () => {}
-	}, []);
-
 	return (
 		<InlineStack align='center' gap='400' blockAlign='center'>
-			<img src={logo} alt='logo' />
+			{ navigationElements }
 		</InlineStack>
 	);
 };

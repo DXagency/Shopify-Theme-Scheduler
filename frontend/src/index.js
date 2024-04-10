@@ -4,15 +4,13 @@ import './index.css';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import enTranslations from '@shopify/polaris/locales/en.json';
-import {AppProvider, Page, BlockStack, Layout, Frame} from '@shopify/polaris';
+import {AppProvider, Page, Layout, Frame} from '@shopify/polaris';
 
 import AuthComponent from './components/Auth';
-import Login from './components/Login';
 import Home from './components/Home';
 import Header from "./components/Header";
 import Stores from "./components/Stores";
 import Schedules  from "./components/Schedules";
-import Accounts from "./components/Accounts";
 
 import '@shopify/polaris/build/esm/styles.css';
 import '@fontsource/inter';
